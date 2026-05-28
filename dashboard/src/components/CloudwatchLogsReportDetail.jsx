@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import StatusBadge from "./StatusBadge.jsx";
 
 const ACCOUNT_ALIASES = {
@@ -7,10 +7,11 @@ const ACCOUNT_ALIASES = {
   "213698163176": "QA",
 };
 
-const TOP_OPTIONS = [10, 25, 50, 100];
+const PAGE_SIZE_OPTIONS = [10, 25, 50, 100];
 
 export default function CloudwatchLogsReportDetail({ report }) {
-  const [topN, setTopN] = useState(25);
+  const [pageSize, setPageSize] = useState(25);
+  const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
   const [regionFilter, setRegionFilter] = useState("all");
   const [retentionFilter, setRetentionFilter] = useState("all");
@@ -42,10 +43,19 @@ export default function CloudwatchLogsReportDetail({ report }) {
   }, [results, search, regionFilter, retentionFilter]);
 
   // El backend ya ordena por incoming_bytes desc.
-  const top = filtered.slice(0, topN);
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const safePage = Math.min(page, totalPages);
+  const startIdx = (safePage - 1) * pageSize;
+  const pageItems = filtered.slice(startIdx, startIdx + pageSize);
 
-  // Para barras de proporción contra el máximo del top.
-  const maxBytes = top.reduce((m, r) => Math.max(m, r.incoming_bytes), 0) || 1;
+  // Reset a página 1 si cambian los filtros y la actual queda fuera de rango.
+  useEffect(() => {
+    if (page > totalPages) setPage(1);
+  }, [filtered.length, pageSize, page, totalPages]);
+
+  // Para barras de proporción contra el máximo absoluto (no solo de la página actual,
+  // así la barra del #1 global siempre se ve llena).
+  const maxBytes = filtered.reduce((m, r) => Math.max(m, r.incoming_bytes), 0) || 1;
 
   return (
     <div>
@@ -145,9 +155,14 @@ export default function CloudwatchLogsReportDetail({ report }) {
       {/* Toolbar */}
       <div style={styles.toolbar}>
         <div style={styles.filterGroup}>
-          {TOP_OPTIONS.map((n) => (
-            <FilterButton key={n} active={topN === n} onClick={() => setTopN(n)}>
-              Top {n}
+          <span style={styles.toolbarLabel}>Por página:</span>
+          {PAGE_SIZE_OPTIONS.map((n) => (
+            <FilterButton
+              key={n}
+              active={pageSize === n}
+              onClick={() => { setPageSize(n); setPage(1); }}
+            >
+              {n}
             </FilterButton>
           ))}
           {retentionFilter === "no-retention" && (
@@ -195,19 +210,20 @@ export default function CloudwatchLogsReportDetail({ report }) {
             </tr>
           </thead>
           <tbody>
-            {top.length === 0 ? (
+            {pageItems.length === 0 ? (
               <tr>
                 <td colSpan={8} style={{ ...styles.td, textAlign: "center", color: "var(--muted)", padding: 32 }}>
                   Sin resultados para el filtro actual
                 </td>
               </tr>
             ) : (
-              top.map((r, idx) => {
+              pageItems.map((r, idx) => {
+                const globalRank = startIdx + idx + 1;
                 const pct = (r.incoming_bytes / maxBytes) * 100;
                 return (
                   <tr key={`${r.region}::${r.name}`} style={styles.trHover}>
                     <td style={{ ...styles.td, color: "var(--muted)", fontWeight: 600, width: 36 }}>
-                      {idx + 1}
+                      {globalRank}
                     </td>
                     <td style={{ ...styles.td, fontFamily: "ui-monospace, monospace", fontSize: 12, wordBreak: "break-all", maxWidth: 380 }}>
                       {r.name}
@@ -239,12 +255,101 @@ export default function CloudwatchLogsReportDetail({ report }) {
       </div>
 
       {filtered.length > 0 && (
-        <div style={styles.footnote}>
-          Mostrando top <strong>{top.length}</strong> de {filtered.length.toLocaleString()} log groups (filtrados de {results.length.toLocaleString()})
-        </div>
+        <Pagination
+          page={safePage}
+          totalPages={totalPages}
+          totalItems={filtered.length}
+          totalAll={results.length}
+          startIdx={startIdx}
+          endIdx={Math.min(startIdx + pageSize, filtered.length)}
+          onChange={setPage}
+        />
       )}
     </div>
   );
+}
+
+function Pagination({ page, totalPages, totalItems, totalAll, startIdx, endIdx, onChange }) {
+  const pages = useMemo(() => buildPageList(page, totalPages), [page, totalPages]);
+
+  return (
+    <div style={styles.pagination}>
+      <div style={styles.paginationInfo}>
+        Mostrando <strong>{startIdx + 1}</strong>–<strong>{endIdx}</strong> de{" "}
+        <strong>{totalItems.toLocaleString()}</strong>
+        {totalAll !== totalItems && (
+          <> (filtrados de {totalAll.toLocaleString()})</>
+        )}
+      </div>
+      <div style={styles.paginationControls}>
+        <PageButton disabled={page === 1} onClick={() => onChange(1)} title="Primera página">⏮</PageButton>
+        <PageButton disabled={page === 1} onClick={() => onChange(page - 1)} title="Anterior">‹</PageButton>
+        {pages.map((p, i) =>
+          p === "…" ? (
+            <span key={`ellipsis-${i}`} style={styles.pageEllipsis}>…</span>
+          ) : (
+            <PageButton
+              key={p}
+              active={p === page}
+              onClick={() => onChange(p)}
+            >
+              {p}
+            </PageButton>
+          )
+        )}
+        <PageButton disabled={page === totalPages} onClick={() => onChange(page + 1)} title="Siguiente">›</PageButton>
+        <PageButton disabled={page === totalPages} onClick={() => onChange(totalPages)} title="Última página">⏭</PageButton>
+      </div>
+    </div>
+  );
+}
+
+function PageButton({ children, active, disabled, onClick, title }) {
+  const [hover, setHover] = useState(false);
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      title={title}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+      style={{
+        minWidth: 32,
+        height: 32,
+        padding: "0 10px",
+        background: active ? "var(--accent)" : (hover && !disabled ? "var(--accent-soft)" : "var(--surface)"),
+        color: active ? "#fff" : (disabled ? "var(--border-strong)" : (hover ? "var(--accent)" : "var(--text-2)")),
+        border: `1px solid ${active ? "var(--accent)" : "var(--border)"}`,
+        borderRadius: 8,
+        cursor: disabled ? "not-allowed" : "pointer",
+        fontSize: 13,
+        fontWeight: active ? 700 : 500,
+        fontFamily: "inherit",
+        transition: "all var(--t-fast)",
+      }}
+    >
+      {children}
+    </button>
+  );
+}
+
+/**
+ * Devuelve [1, 2, 3, "…", 9, 10] tipo lista compacta de páginas.
+ * Mantiene siempre visibles: 1, último, current ± 1.
+ */
+function buildPageList(current, total) {
+  if (total <= 7) {
+    return Array.from({ length: total }, (_, i) => i + 1);
+  }
+  const pages = new Set([1, total, current, current - 1, current + 1]);
+  const sorted = Array.from(pages).filter((p) => p >= 1 && p <= total).sort((a, b) => a - b);
+  const result = [];
+  sorted.forEach((p, idx) => {
+    if (idx > 0 && p - sorted[idx - 1] > 1) result.push("…");
+    result.push(p);
+  });
+  return result;
 }
 
 function BytesBar({ bytes, pct }) {
@@ -511,5 +616,37 @@ const styles = {
     fontSize: 12,
     marginTop: 12,
     textAlign: "right",
+  },
+  toolbarLabel: {
+    fontSize: 11,
+    fontWeight: 700,
+    textTransform: "uppercase",
+    letterSpacing: ".06em",
+    color: "var(--muted)",
+    marginRight: 4,
+  },
+  pagination: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+    marginTop: 16,
+    flexWrap: "wrap",
+  },
+  paginationInfo: {
+    color: "var(--muted)",
+    fontSize: 12,
+  },
+  paginationControls: {
+    display: "flex",
+    alignItems: "center",
+    gap: 4,
+    flexWrap: "wrap",
+  },
+  pageEllipsis: {
+    color: "var(--muted)",
+    fontSize: 13,
+    padding: "0 4px",
+    userSelect: "none",
   },
 };
