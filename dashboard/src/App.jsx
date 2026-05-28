@@ -3,6 +3,7 @@ import ReportTimeline from "./components/ReportTimeline.jsx";
 import ReportDetail from "./components/ReportDetail.jsx";
 import AuditTypeTabs from "./components/AuditTypeTabs.jsx";
 import TimelineFilters from "./components/TimelineFilters.jsx";
+import InsightsPanel from "./components/InsightsPanel.jsx";
 
 const INDEX_URL = "./reports/index.json";
 
@@ -186,6 +187,15 @@ export default function App() {
               onAccountChange={setAccountFilter}
               onDateChange={setDateFilter}
               accent={activeTypeMeta?.accent}
+            />
+          )}
+
+          {reportsForType.length > 0 && (
+            <InsightsPanel
+              reports={reportsForType}
+              scriptId={activeType}
+              accent={activeTypeMeta?.accent}
+              accountFilter={accountFilter}
             />
           )}
 
