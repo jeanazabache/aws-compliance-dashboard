@@ -1,0 +1,331 @@
+import { useState, useEffect, useMemo, useCallback } from "react";
+import ReportTimeline from "./components/ReportTimeline.jsx";
+import ReportDetail from "./components/ReportDetail.jsx";
+import AuditTypeTabs from "./components/AuditTypeTabs.jsx";
+import TimelineFilters from "./components/TimelineFilters.jsx";
+
+const INDEX_URL = "./reports/index.json";
+
+// Definición de los tipos de auditoría que entiende el dashboard.
+const AUDIT_TYPES = [
+  {
+    id: "audit_utp_repos",
+    label: "Repositorios GitHub",
+    description: "Compliance de repos UTPXpedition",
+    icon: "🐙",
+    accent: "#4f46e5",
+  },
+  {
+    id: "audit_aws_tags",
+    label: "Tags en recursos AWS",
+    description: "Cobertura del tag t.aplicacion",
+    icon: "🏷️",
+    accent: "#0ea5e9",
+  },
+  {
+    id: "audit_cloudwatch_logs",
+    label: "CloudWatch Logs",
+    description: "Top de log groups por ingesta",
+    icon: "📊",
+    accent: "#f59e0b",
+  },
+];
+
+export default function App() {
+  const [index, setIndex] = useState(null);
+  const [activeType, setActiveType] = useState(AUDIT_TYPES[0].id);
+  const [selectedPath, setSelectedPath] = useState(null);
+  const [report, setReport] = useState(null);
+  const [loadingIndex, setLoadingIndex] = useState(true);
+  const [loadingReport, setLoadingReport] = useState(false);
+  const [error, setError] = useState(null);
+
+  // Filtros aplicados al timeline (solo en auditorías multi-cuenta).
+  const [accountFilter, setAccountFilter] = useState("all");
+  const [dateFilter, setDateFilter] = useState(null); // formato YYYY-MM-DD
+
+  const loadIndex = useCallback(async () => {
+    setLoadingIndex(true);
+    setError(null);
+    try {
+      const res = await fetch(`${INDEX_URL}?t=${Date.now()}`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      setIndex(data);
+    } catch (e) {
+      setError(`No se pudo cargar el índice de reportes: ${e.message}`);
+    } finally {
+      setLoadingIndex(false);
+    }
+  }, []);
+
+  useEffect(() => { loadIndex(); }, [loadIndex]);
+
+  // Reportes filtrados al tipo de auditoría activo.
+  const reportsForType = useMemo(() => {
+    if (!index?.reports) return [];
+    return index.reports.filter((r) => r.script === activeType);
+  }, [index, activeType]);
+
+  const activeTypeMeta = AUDIT_TYPES.find((t) => t.id === activeType);
+
+  // Aplica filtros (cuenta + fecha) al subconjunto del tipo activo.
+  const visibleReports = useMemo(() => {
+    return reportsForType.filter((r) => {
+      if (accountFilter !== "all" && r.account_id !== accountFilter) return false;
+      if (dateFilter) {
+        const day = (r.timestamp || "").slice(0, 10);
+        if (day !== dateFilter) return false;
+      }
+      return true;
+    });
+  }, [reportsForType, accountFilter, dateFilter]);
+
+  // Reset de filtros al cambiar de tipo de auditoría.
+  useEffect(() => {
+    setAccountFilter("all");
+    setDateFilter(null);
+  }, [activeType]);
+
+  // Stats agregados por tipo, para mostrar en las tabs.
+  const statsByType = useMemo(() => {
+    const stats = {};
+    AUDIT_TYPES.forEach((t) => {
+      stats[t.id] = { count: 0, latest: null };
+    });
+    (index?.reports ?? []).forEach((r) => {
+      if (!stats[r.script]) return;
+      stats[r.script].count += 1;
+      if (!stats[r.script].latest || r.timestamp > stats[r.script].latest.timestamp) {
+        stats[r.script].latest = r;
+      }
+    });
+    return stats;
+  }, [index]);
+
+  // Auto-seleccionar el más reciente del tipo activo cuando cambian.
+  useEffect(() => {
+    if (visibleReports.length === 0) {
+      setSelectedPath(null);
+      setReport(null);
+      return;
+    }
+    const stillExists = visibleReports.find((r) => r.path === selectedPath);
+    if (!stillExists) {
+      setSelectedPath(visibleReports[0].path);
+    }
+  }, [visibleReports, selectedPath]);
+
+  // Cargar el reporte seleccionado.
+  useEffect(() => {
+    if (!selectedPath) return;
+    setLoadingReport(true);
+    setReport(null);
+    fetch(`./${selectedPath}?t=${Date.now()}`)
+      .then((r) => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); })
+      .then((data) => setReport(data))
+      .catch((e) => setError(`No se pudo cargar el reporte: ${e.message}`))
+      .finally(() => setLoadingReport(false));
+  }, [selectedPath]);
+
+  return (
+    <div style={styles.shell}>
+      {/* Topbar */}
+      <header className="topbar">
+        <div className="topbar__left">
+          <img src="./utp-logo.svg" alt="UTP" className="topbar__logo" />
+          <div className="topbar__title-block">
+            <div className="topbar__title">AWS Operaciones &amp; DevOps</div>
+            <div className="topbar__subtitle">Auditorías programadas · UTPXpedition</div>
+          </div>
+        </div>
+        <button className="refresh-btn" onClick={loadIndex} title="Recargar índice">
+          <span style={{ fontSize: 14 }}>↺</span>
+          <span className="refresh-btn__label">Actualizar</span>
+        </button>
+      </header>
+
+      <main style={styles.main} className="app-main">
+        {error && (
+          <div style={styles.errorBox}>
+            <strong>Error:</strong> {error}
+          </div>
+        )}
+
+        {/* Selector de tipo de auditoría */}
+        <AuditTypeTabs
+          types={AUDIT_TYPES}
+          activeType={activeType}
+          stats={statsByType}
+          loading={loadingIndex}
+          onSelect={setActiveType}
+        />
+
+        {/* Timeline horizontal de reportes del tipo activo */}
+        <section style={styles.section}>
+          <div style={styles.sectionHeader}>
+            <div>
+              <div style={styles.sectionTitle}>
+                {activeTypeMeta?.icon} {activeTypeMeta?.label}
+              </div>
+              <div style={styles.sectionSubtitle}>
+                {reportsForType.length === 0
+                  ? "Sin reportes para esta auditoría"
+                  : visibleReports.length !== reportsForType.length
+                    ? `${visibleReports.length} de ${reportsForType.length} reportes (filtrados)`
+                    : `${reportsForType.length} reportes históricos · selecciona uno`}
+              </div>
+            </div>
+          </div>
+
+          {reportsForType.length > 0 && (
+            <TimelineFilters
+              reports={reportsForType}
+              accountFilter={accountFilter}
+              dateFilter={dateFilter}
+              onAccountChange={setAccountFilter}
+              onDateChange={setDateFilter}
+              accent={activeTypeMeta?.accent}
+            />
+          )}
+
+          <ReportTimeline
+            reports={visibleReports}
+            selectedPath={selectedPath}
+            onSelect={setSelectedPath}
+            accent={activeTypeMeta?.accent}
+            loading={loadingIndex}
+          />
+        </section>
+
+        {/* Detalle del reporte */}
+        <section style={styles.section}>
+          {loadingReport ? (
+            <DetailSkeleton />
+          ) : report ? (
+            <div className="fade-in-up" key={selectedPath}>
+              <ReportDetail report={report} />
+            </div>
+          ) : !loadingIndex && visibleReports.length === 0 ? (
+            <EmptyState
+              typeMeta={activeTypeMeta}
+              hasFilters={accountFilter !== "all" || !!dateFilter}
+              onClearFilters={() => { setAccountFilter("all"); setDateFilter(null); }}
+            />
+          ) : null}
+        </section>
+      </main>
+
+      <footer className="app-footer">
+        By Jean Azabache Medina
+      </footer>
+    </div>
+  );
+}
+
+function EmptyState({ typeMeta, hasFilters, onClearFilters }) {
+  return (
+    <div style={styles.emptyState}>
+      <div style={{ fontSize: 56, marginBottom: 16 }}>{typeMeta?.icon ?? "📭"}</div>
+      <div style={styles.emptyTitle}>
+        {hasFilters ? "Sin reportes con esos filtros" : "No hay reportes todavía"}
+      </div>
+      <div style={styles.emptyText}>
+        {hasFilters ? (
+          <>
+            Prueba con otra cuenta o fecha.{" "}
+            <button
+              onClick={onClearFilters}
+              style={{
+                background: "none",
+                border: "none",
+                color: "var(--accent)",
+                cursor: "pointer",
+                fontWeight: 600,
+                fontSize: 14,
+                padding: 0,
+              }}
+            >
+              Limpiar filtros
+            </button>
+          </>
+        ) : (
+          <>Ejecuta la Lambda de <strong>{typeMeta?.label}</strong> para ver los resultados aquí.</>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function DetailSkeleton() {
+  return (
+    <div className="fade-in" style={{ display: "grid", gap: 16 }}>
+      <div className="skeleton" style={{ height: 48, width: "40%" }} />
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 12 }}>
+        {[1,2,3,4].map((i) => (
+          <div key={i} className="skeleton" style={{ height: 80 }} />
+        ))}
+      </div>
+      <div className="skeleton" style={{ height: 320 }} />
+    </div>
+  );
+}
+
+const styles = {
+  shell: {
+    display: "flex",
+    flexDirection: "column",
+    minHeight: "100vh",
+    background: "var(--bg)",
+  },
+  main: {
+    flex: 1,
+    width: "100%",
+    margin: "0 auto",
+  },
+  section: {
+    marginTop: 24,
+  },
+  sectionHeader: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 14,
+  },
+  sectionTitle: {
+    fontSize: 15,
+    fontWeight: 700,
+    color: "var(--text)",
+  },
+  sectionSubtitle: {
+    fontSize: 12,
+    color: "var(--muted)",
+    marginTop: 2,
+  },
+  errorBox: {
+    background: "var(--red-soft)",
+    border: "1px solid #fecaca",
+    borderRadius: "var(--radius)",
+    padding: "12px 16px",
+    color: "#b91c1c",
+    fontSize: 13,
+    marginBottom: 16,
+  },
+  emptyState: {
+    background: "var(--surface)",
+    border: "1px dashed var(--border-strong)",
+    borderRadius: "var(--radius)",
+    padding: "60px 24px",
+    textAlign: "center",
+  },
+  emptyTitle: {
+    fontSize: 17,
+    fontWeight: 600,
+    color: "var(--text)",
+    marginBottom: 6,
+  },
+  emptyText: {
+    color: "var(--muted)",
+    fontSize: 14,
+  },
+};

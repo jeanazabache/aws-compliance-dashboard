@@ -1,0 +1,23 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": [
+        "secretsmanager:GetSecretValue"
+      ],
+      "Resource": [
+        "arn:aws:secretsmanager:us-east-1:792654060327:secret:UTP-AOPE-SM-00-AccesKey-GHE/Access-qAKqtb",
+        "arn:aws:secretsmanager:us-east-1:792654060327:secret:UTP-AOPE-SM-00-AccesKey-GHE/Access-qAKqtb*"
+      ]
+    },
+    {
+      "Effect": "Allow",
+      "Action": [
+        "s3:GetObject",
+        "s3:PutObject"
+      ],
+      "Resource": "arn:aws:s3:::utp-aope-reportes-de-auditoria/*"
+    }
+  ]
+}

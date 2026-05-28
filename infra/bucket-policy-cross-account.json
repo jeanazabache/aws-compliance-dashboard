@@ -1,0 +1,37 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "AllowCloudFrontServicePrincipalReadOnly",
+      "Effect": "Allow",
+      "Principal": { "Service": "cloudfront.amazonaws.com" },
+      "Action": "s3:GetObject",
+      "Resource": "arn:aws:s3:::utp-aope-reportes-de-auditoria/*",
+      "Condition": {
+        "StringEquals": {
+          "AWS:SourceArn": "arn:aws:cloudfront::792654060327:distribution/EG6X3GGBAMYXT"
+        }
+      }
+    },
+    {
+      "Sid": "AllowCrossAccountAuditWrites",
+      "Effect": "Allow",
+      "Principal": {
+        "AWS": [
+          "arn:aws:iam::792654060327:root",
+          "arn:aws:iam::503134114226:root",
+          "arn:aws:iam::213698163176:root"
+        ]
+      },
+      "Action": [
+        "s3:GetObject",
+        "s3:PutObject"
+      ],
+      "Resource": [
+        "arn:aws:s3:::utp-aope-reportes-de-auditoria/reports/audit_aws_tags/*",
+        "arn:aws:s3:::utp-aope-reportes-de-auditoria/reports/audit_cloudwatch_logs/*",
+        "arn:aws:s3:::utp-aope-reportes-de-auditoria/reports/index.json"
+      ]
+    }
+  ]
+}
