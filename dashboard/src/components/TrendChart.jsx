@@ -54,10 +54,10 @@ export default function TrendChart({ reports, scriptId, accent }) {
     return <EmptyChart message="Sin datos suficientes para mostrar tendencia" />;
   }
 
-  // Geometría del SVG
+  // Geometría del SVG (más compacta)
   const W = 1000;
-  const H = 240;
-  const PAD = { top: 16, right: 16, bottom: 36, left: 48 };
+  const H = 160;
+  const PAD = { top: 12, right: 16, bottom: 30, left: 44 };
   const innerW = W - PAD.left - PAD.right;
   const innerH = H - PAD.top - PAD.bottom;
   const stepX = innerW / Math.max(1, days.length - 1);

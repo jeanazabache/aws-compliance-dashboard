@@ -1,5 +1,4 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
-import ReportTimeline from "./components/ReportTimeline.jsx";
 import ReportDetail from "./components/ReportDetail.jsx";
 import AuditTypeTabs from "./components/AuditTypeTabs.jsx";
 import TimelineFilters from "./components/TimelineFilters.jsx";
@@ -174,7 +173,7 @@ export default function App() {
                   ? "Sin reportes para esta auditoría"
                   : visibleReports.length !== reportsForType.length
                     ? `${visibleReports.length} de ${reportsForType.length} reportes (filtrados)`
-                    : `${reportsForType.length} reportes históricos · selecciona uno`}
+                    : `${reportsForType.length} reportes históricos`}
               </div>
             </div>
           </div>
@@ -198,14 +197,6 @@ export default function App() {
               accountFilter={accountFilter}
             />
           )}
-
-          <ReportTimeline
-            reports={visibleReports}
-            selectedPath={selectedPath}
-            onSelect={setSelectedPath}
-            accent={activeTypeMeta?.accent}
-            loading={loadingIndex}
-          />
         </section>
 
         {/* Detalle del reporte */}

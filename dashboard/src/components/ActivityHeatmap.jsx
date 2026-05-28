@@ -98,7 +98,7 @@ export default function ActivityHeatmap({ reports, scriptId, account }) {
     }
   });
 
-  const cellSize = 12;
+  const cellSize = 10;
   const cellGap = 2;
   const stepX = cellSize + cellGap;
   const stepY = cellSize + cellGap;
