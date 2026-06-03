@@ -52,8 +52,9 @@ Los usuarios autorizados están en el grupo `SG-APP-AWS-USERS` (49 miembros), fe
 | 01 | `UTP-AOPE-LA-01-Reporte-de-Auditoria`           | Repos GitHub UTPXpedition (master + env prd + team approval) |
 | 02 | `UTP-AOPE-LA-02-Reporte-de-Tag-Resource`        | Tag obligatorio `t.aplicacion` en recursos AWS               |
 | 03 | `UTP-AOPE-LA-03-Reporte-de-CloudWatch-Logs`     | Top de log groups por ingesta + retention + costo            |
+| 04 | `UTP-AOPE-LA-04-Reporte-de-ECS-Fluentbit`       | Servicios ECS con el sidecar `agent-fluentbit`               |
 
-Para una Lambda nueva: usa el siguiente número disponible (`04`, `05`...).
+Para una Lambda nueva: usa el siguiente número disponible (`05`, `06`...).
 
 ---
 
@@ -96,6 +97,7 @@ EventBridge (cron diario por cuenta)
 | `UTP-AOPE-LA-01-Reporte-de-Auditoria`           | ✅  | —   | —   | `cron(0 9 * * ? *)`    |
 | `UTP-AOPE-LA-02-Reporte-de-Tag-Resource`        | ✅  | ✅  | ✅  | DEV 30, QA 33, PRD 35  |
 | `UTP-AOPE-LA-03-Reporte-de-CloudWatch-Logs`     | ✅  | ✅  | ✅  | DEV 40, QA 43, PRD 45  |
+| `UTP-AOPE-LA-04-Reporte-de-ECS-Fluentbit`       | ✅  | ✅  | ✅  | cada 4h: DEV :00, QA :03, PRD :06 |
 
 Detalles completos en la sección "Programación de EventBridge" más abajo.
 
@@ -126,7 +128,14 @@ agn-audit-platform/
 │   │   ├── env.json
 │   │   ├── inline-policy.json
 │   │   └── trust-policy.json
-│   └── audit_cloudwatch_logs/            ← Lambda 03
+│   ├── audit_cloudwatch_logs/            ← Lambda 03
+│   │   ├── handler.py
+│   │   ├── audit_core.py
+│   │   ├── requirements.txt              ← (vacío, boto3 viene en runtime)
+│   │   ├── env.json
+│   │   ├── inline-policy.json
+│   │   └── trust-policy.json
+│   └── audit_ecs_fluentbit/             ← Lambda 04
 │       ├── handler.py
 │       ├── audit_core.py
 │       ├── requirements.txt              ← (vacío, boto3 viene en runtime)
@@ -146,12 +155,16 @@ agn-audit-platform/
         ├── index.css                     ← variables CSS, responsive, animaciones
         └── components/
             ├── AuditTypeTabs.jsx         ← tabs grandes por tipo de auditoría
-            ├── ReportTimeline.jsx        ← chips horizontales del histórico
             ├── TimelineFilters.jsx       ← filtro de cuenta + fecha
+            ├── InsightsPanel.jsx         ← contenedor de tendencia/heatmap
+            ├── TrendChart.jsx            ← gráfico de tendencia 30 días (SVG)
+            ├── ActivityHeatmap.jsx       ← calendario tipo GitHub (SVG)
+            ├── insightsHelpers.js        ← helpers compartidos de insights
             ├── ReportDetail.jsx          ← despachador: VIEW_BY_SCRIPT
             ├── UtpReposReportDetail.jsx  ← vista del audit 01
             ├── AwsTagsReportDetail.jsx   ← vista del audit 02
             ├── CloudwatchLogsReportDetail.jsx ← vista del audit 03
+            ├── EcsFluentbitReportDetail.jsx   ← vista del audit 04
             └── StatusBadge.jsx
 ```
 
@@ -357,6 +370,48 @@ aws events put-targets --rule $rule --targets "Id=1,Arn=$lambdaArn"
 
 ---
 
+## Lambda 04 — ECS Fluent Bit (`UTP-AOPE-LA-04-Reporte-de-ECS-Fluentbit`)
+
+**Multi-cuenta.** Escribe en `reports/audit_ecs_fluentbit/<account_id>/`. Ejecución
+**cada 4 horas** (no diaria), por lo que la duración del escaneo no es crítica.
+
+**Qué audita:** recorre todos los clusters ECS de la cuenta y, por cada servicio,
+inspecciona la task definition configurada para verificar si incluye el contenedor
+sidecar de Fluent Bit (`agent-fluentbit`). Flujo: `ecs:ListClusters` →
+`ecs:ListServices` → `ecs:DescribeServices` (lotes de 10) → `ecs:DescribeTaskDefinition`
+(con cache por ARN). Multi-región en paralelo (`ThreadPoolExecutor`).
+
+- `Compliant`: la task definition tiene un contenedor llamado exactamente
+  `agent-fluentbit`.
+- `Non-compliant`: no lo tiene (aunque tenga otros sidecars como `datadog-agent`).
+- `Skipped`: no se pudo describir la task definition.
+
+**Env vars:**
+- `REPORTS_BUCKET` = `utp-aope-reportes-de-auditoria`.
+- `SCAN_MAX_WORKERS` (default `8`).
+- `FLUENTBIT_CONTAINER_NAME` (default `agent-fluentbit`) — nombre exacto del sidecar.
+
+**Permisos requeridos** (`inline-policy.json`):
+- `ecs:ListClusters`, `ecs:ListServices`, `ecs:DescribeServices`, `ecs:DescribeTaskDefinition`.
+- `ec2:DescribeRegions`, `sts:GetCallerIdentity`.
+- `s3:GetObject`, `s3:PutObject` sobre el bucket central.
+
+**Reporte:** `summary` estándar (`total` servicios, `compliant`, `needs_action`,
+`skipped`) + `clusters` (conteo) + un array `clusters[]` con agregado por cluster +
+`results[]` con cada servicio (cluster, servicio, región, task definition,
+`containers[]`, `launch_type`, estado).
+
+**Despliegue:** mismos 6 pasos que el Lambda 02. El timeout recomendado es 600s.
+Antes de desplegar en QA/PRD, la bucket policy ya incluye el prefijo
+`reports/audit_ecs_fluentbit/*`.
+
+**Estado actual (validación inicial):**
+- DEV: 192 servicios, 105 con Fluent Bit, 87 sin él, 51 clusters.
+- QA: 165 servicios, 101 con Fluent Bit, 64 sin él, 38 clusters.
+- PRD: 131 servicios, 82 con Fluent Bit, 49 sin él, 36 clusters.
+
+---
+
 ## Programación de EventBridge
 
 | Hora UTC  | Cuenta             | Lambda                                           | Cron                  |
@@ -368,6 +423,9 @@ aws events put-targets --rule $rule --targets "Id=1,Arn=$lambdaArn"
 | 09:40     | DEV (792654060327) | `UTP-AOPE-LA-03-Reporte-de-CloudWatch-Logs`      | `cron(40 9 * * ? *)`  |
 | 09:43     | QA  (213698163176) | `UTP-AOPE-LA-03-Reporte-de-CloudWatch-Logs`      | `cron(43 9 * * ? *)`  |
 | 09:45     | PRD (503134114226) | `UTP-AOPE-LA-03-Reporte-de-CloudWatch-Logs`      | `cron(45 9 * * ? *)`  |
+| cada 4h :00 | DEV (792654060327) | `UTP-AOPE-LA-04-Reporte-de-ECS-Fluentbit`     | `cron(0 0/4 * * ? *)` |
+| cada 4h :03 | QA  (213698163176) | `UTP-AOPE-LA-04-Reporte-de-ECS-Fluentbit`     | `cron(3 0/4 * * ? *)` |
+| cada 4h :06 | PRD (503134114226) | `UTP-AOPE-LA-04-Reporte-de-ECS-Fluentbit`     | `cron(6 0/4 * * ? *)` |
 
 **Por qué separadas por minutos:** todas escriben al mismo `reports/index.json` (read-modify-write). 5 min entre escrituras evita race conditions sin necesidad de locking.
 

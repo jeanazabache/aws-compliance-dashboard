@@ -1,0 +1,1 @@
+# boto3 viene incluido en el runtime Python 3.12 de Lambda. Sin dependencias externas.

@@ -25,12 +25,39 @@ export default function AuditTypeTabs({ types, activeType, stats, loading, onSel
 
 function TabCard({ type, stats, active, loading, onClick }) {
   const [hover, setHover] = useState(false);
-  const latest = stats?.latest;
-  const summary = latest?.summary;
+  const agg = stats?.aggregated;
 
-  const compliance = summary?.total
-    ? Math.round((summary.compliant / summary.total) * 100)
-    : null;
+  // Para CloudWatch Logs no aplica un % de compliance — mostramos GB ingestados totales.
+  const isLogsAudit = type.id === "audit_cloudwatch_logs";
+
+  let primary = null;
+  let primaryColor = "var(--muted)";
+  let secondary = null;
+
+  if (agg) {
+    if (isLogsAudit) {
+      // Sumar bytes y costo desde los summaries de cada cuenta más reciente.
+      const totalBytes = stats.latestByAccount
+        ? Object.values(stats.latestByAccount).reduce((s, r) => s + (r.summary?.total_incoming_bytes ?? 0), 0)
+        : 0;
+      const totalCost = stats.latestByAccount
+        ? Object.values(stats.latestByAccount).reduce((s, r) => s + (r.summary?.estimated_cost_usd ?? 0), 0)
+        : 0;
+      primary = formatBytesShort(totalBytes);
+      primaryColor = totalCost > 100 ? "var(--red)" : (totalCost > 30 ? "var(--yellow)" : "var(--green)");
+      secondary = `$${totalCost.toFixed(0)} USD/sem · ${agg.total.toLocaleString()} log groups`;
+    } else {
+      const denominator = agg.total - agg.skipped;
+      const pct = denominator > 0 ? Math.round((agg.compliant / denominator) * 100) : null;
+      if (pct !== null) {
+        primary = `${pct}%`;
+        primaryColor = complianceColor(pct);
+        secondary = `${agg.compliant.toLocaleString()} / ${agg.total.toLocaleString()} compliant`;
+      }
+    }
+  }
+
+  const accountsLabel = agg && agg.accounts > 1 ? `${agg.accounts} cuentas` : null;
 
   return (
     <button
@@ -65,15 +92,15 @@ function TabCard({ type, stats, active, loading, onClick }) {
       <div style={styles.cardRight}>
         {loading ? (
           <div className="skeleton" style={{ height: 30, width: 80 }} />
-        ) : compliance !== null ? (
+        ) : primary !== null ? (
           <>
-            <div style={{ ...styles.complianceValue, color: complianceColor(compliance) }}>
-              {compliance}%
+            <div style={{ ...styles.complianceValue, color: primaryColor }}>
+              {primary}
             </div>
+            <div style={styles.cardMeta}>{secondary}</div>
             <div style={styles.cardMeta}>
-              {summary.compliant} / {summary.total} compliant
+              {accountsLabel ? `${accountsLabel} · ` : ""}{stats.count} reportes
             </div>
-            <div style={styles.cardMeta}>{stats.count} reportes</div>
           </>
         ) : (
           <>
@@ -86,6 +113,18 @@ function TabCard({ type, stats, active, loading, onClick }) {
       {active && <div style={{ ...styles.activeBar, background: type.accent }} />}
     </button>
   );
+}
+
+function formatBytesShort(bytes) {
+  if (!bytes || bytes <= 0) return "0 B";
+  const units = ["B", "KB", "MB", "GB", "TB"];
+  let i = 0;
+  let n = bytes;
+  while (n >= 1024 && i < units.length - 1) {
+    n /= 1024;
+    i++;
+  }
+  return `${n.toFixed(n >= 100 ? 0 : n >= 10 ? 1 : 2)} ${units[i]}`;
 }
 
 function complianceColor(pct) {

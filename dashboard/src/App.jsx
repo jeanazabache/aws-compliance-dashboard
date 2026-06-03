@@ -3,6 +3,7 @@ import ReportDetail from "./components/ReportDetail.jsx";
 import AuditTypeTabs from "./components/AuditTypeTabs.jsx";
 import TimelineFilters from "./components/TimelineFilters.jsx";
 import InsightsPanel from "./components/InsightsPanel.jsx";
+import { signOut, getUsername, isAuthConfigured } from "./auth/cognito.js";
 
 const INDEX_URL = "./reports/index.json";
 
@@ -28,6 +29,13 @@ const AUDIT_TYPES = [
     description: "Top de log groups por ingesta",
     icon: "📊",
     accent: "#f59e0b",
+  },
+  {
+    id: "audit_ecs_fluentbit",
+    label: "Fluent Bit en ECS",
+    description: "Servicios ECS con sidecar de logging",
+    icon: "🚢",
+    accent: "#0891b2",
   },
 ];
 
@@ -88,18 +96,47 @@ export default function App() {
   }, [activeType]);
 
   // Stats agregados por tipo, para mostrar en las tabs.
+  // Para audits multi-cuenta: tomamos el reporte más reciente DE CADA CUENTA y sumamos.
+  // Así el % es el promedio real entre todas las cuentas, no el de una sola.
   const statsByType = useMemo(() => {
     const stats = {};
     AUDIT_TYPES.forEach((t) => {
-      stats[t.id] = { count: 0, latest: null };
+      stats[t.id] = { count: 0, latestByAccount: {}, aggregated: null };
     });
+
     (index?.reports ?? []).forEach((r) => {
-      if (!stats[r.script]) return;
-      stats[r.script].count += 1;
-      if (!stats[r.script].latest || r.timestamp > stats[r.script].latest.timestamp) {
-        stats[r.script].latest = r;
+      const bucket = stats[r.script];
+      if (!bucket) return;
+      bucket.count += 1;
+      const accKey = r.account_id ?? "single";
+      const prev = bucket.latestByAccount[accKey];
+      if (!prev || r.timestamp > prev.timestamp) {
+        bucket.latestByAccount[accKey] = r;
       }
     });
+
+    // Sumar los summaries de cada cuenta más reciente.
+    Object.values(stats).forEach((bucket) => {
+      const latests = Object.values(bucket.latestByAccount);
+      if (latests.length === 0) return;
+
+      const agg = {
+        total: 0,
+        compliant: 0,
+        needs_action: 0,
+        skipped: 0,
+        accounts: latests.length,
+        latestTimestamp: latests.reduce((m, r) => (r.timestamp > m ? r.timestamp : m), ""),
+      };
+      latests.forEach((r) => {
+        agg.total       += r.summary?.total ?? 0;
+        agg.compliant   += r.summary?.compliant ?? 0;
+        agg.needs_action += r.summary?.needs_action ?? 0;
+        agg.skipped     += r.summary?.skipped ?? 0;
+      });
+      bucket.aggregated = agg;
+    });
+
     return stats;
   }, [index]);
 
@@ -139,10 +176,22 @@ export default function App() {
             <div className="topbar__subtitle">Auditorías programadas · UTPXpedition</div>
           </div>
         </div>
-        <button className="refresh-btn" onClick={loadIndex} title="Recargar índice">
-          <span style={{ fontSize: 14 }}>↺</span>
-          <span className="refresh-btn__label">Actualizar</span>
-        </button>
+        <div className="topbar__actions">
+          <button className="refresh-btn" onClick={loadIndex} title="Recargar índice">
+            <span style={{ fontSize: 14 }}>↺</span>
+            <span className="refresh-btn__label">Actualizar</span>
+          </button>
+          {isAuthConfigured && (
+            <button
+              className="refresh-btn"
+              onClick={() => { signOut(); window.location.reload(); }}
+              title={getUsername() ? `Cerrar sesión (${getUsername()})` : "Cerrar sesión"}
+            >
+              <span style={{ fontSize: 14 }}>⎋</span>
+              <span className="refresh-btn__label">Salir</span>
+            </button>
+          )}
+        </div>
       </header>
 
       <main style={styles.main} className="app-main">
