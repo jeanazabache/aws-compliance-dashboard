@@ -40,3 +40,37 @@ aws cognito-idp admin-set-user-password `
   --no-permanent `
   --region us-east-1
 ```
+
+---
+
+## Desplegar cambios del dashboard a S3 + CloudFront
+
+**Cuenta:** DEV (792654060327) — ahí viven el bucket y CloudFront.
+**Todos los comandos se ejecutan desde la carpeta `dashboard/`** (ahí está el `package.json`).
+
+```powershell
+cd dashboard
+
+# 1) Confirmar que estoy en la cuenta DEV (debe devolver 792654060327)
+aws sts get-caller-identity --query Account --output text
+
+# 2) Compilar los cambios de React a dist/
+npm run build
+
+# 3) Subir dist/ al bucket.
+#    --exclude "reports/*" es CRITICO: evita que --delete borre los datos de auditoria.
+aws s3 sync dist/ s3://utp-aope-reportes-de-auditoria/ --exclude "reports/*" --delete
+
+# 4) Invalidar la cache de CloudFront para ver los cambios al instante
+aws cloudfront create-invalidation `
+  --distribution-id EG6X3GGBAMYXT `
+  --paths "/index.html" "/assets/*"
+```
+
+Luego espera 1-2 min y abre https://operaciones.utpxpedition.com/ con Ctrl+F5.
+
+**Notas:**
+- Primera vez en una maquina nueva: corre `npm install` antes del `npm run build`.
+- Si el paso 1 no devuelve la cuenta DEV, vuelve a iniciar sesion en AWS (SSO) antes de seguir.
+- Si el `aws s3 sync` no lista ningun archivo, es que dist/ ya es identico a S3:
+  asegurate de haber editado el codigo fuente Y corrido `npm run build` de nuevo.

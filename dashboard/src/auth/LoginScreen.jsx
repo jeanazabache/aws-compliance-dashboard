@@ -76,7 +76,7 @@ export default function LoginScreen({ onAuthenticated }) {
           <img src="./utp-logo.svg" alt="UTP" className="login-card__logo" />
           <div className="login-card__title">AWS Operaciones &amp; DevOps</div>
           <div className="login-card__subtitle">
-            Acceso interno · Auditorías UTPXpedition
+            Acceso interno
           </div>
         </div>
 
@@ -92,7 +92,7 @@ export default function LoginScreen({ onAuthenticated }) {
                 required
                 autoFocus
                 className="login-field__input"
-                placeholder="tu.usuario@utp.edu.pe"
+                placeholder="usuario@utp.edu.pe"
               />
             </label>
 

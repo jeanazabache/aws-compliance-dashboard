@@ -7,6 +7,20 @@ import { signOut, getUsername, isAuthConfigured } from "./auth/cognito.js";
 
 const INDEX_URL = "./reports/index.json";
 
+// Devuelve el día LOCAL de un timestamp ISO en formato YYYY-MM-DD.
+// El <input type="date"> entrega el día en hora local, y la UI muestra
+// las fechas en hora local (es-PE), así que el filtro debe comparar contra
+// el día local del reporte, no contra el día UTC.
+function localDay(ts) {
+  if (!ts) return "";
+  const d = new Date(ts);
+  if (Number.isNaN(d.getTime())) return "";
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
 // Definición de los tipos de auditoría que entiende el dashboard.
 const AUDIT_TYPES = [
   {
@@ -82,8 +96,10 @@ export default function App() {
     return reportsForType.filter((r) => {
       if (accountFilter !== "all" && r.account_id !== accountFilter) return false;
       if (dateFilter) {
-        const day = (r.timestamp || "").slice(0, 10);
-        if (day !== dateFilter) return false;
+        // Comparar contra el día LOCAL del timestamp (igual que se muestra en la UI),
+        // no contra el día en UTC. Si comparáramos el UTC (slice(0,10)) el filtro
+        // fallaría para reportes cuya hora local cae en un día distinto al UTC.
+        if (localDay(r.timestamp) !== dateFilter) return false;
       }
       return true;
     });
