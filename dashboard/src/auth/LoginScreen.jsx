@@ -156,7 +156,7 @@ export default function LoginScreen({ onAuthenticated }) {
           </form>
         )}
 
-        <div className="login-footer">By Jean Azabache Medina</div>
+        <div className="login-footer"></div>
       </div>
     </div>
   );
