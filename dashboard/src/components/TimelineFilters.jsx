@@ -1,10 +1,5 @@
 import { useState, useMemo } from "react";
-
-const ACCOUNT_ALIASES = {
-  "792654060327": "DEV",
-  "503134114226": "PRD",
-  "213698163176": "QA",
-};
+import { ACCOUNT_ALIASES, ENV_COLORS, ENV_ORDER } from "./insightsHelpers.js";
 
 /**
  * Filtros para el timeline (solo auditorías multi-cuenta).
@@ -22,7 +17,12 @@ export default function TimelineFilters({
   const accounts = useMemo(() => {
     const unique = new Set();
     reports.forEach((r) => r.account_id && unique.add(r.account_id));
-    return Array.from(unique).sort();
+    // Orden por ambiente: DEV → QA → PRD. Cuentas desconocidas van al final.
+    return Array.from(unique).sort((a, b) => {
+      const ra = ENV_ORDER[ACCOUNT_ALIASES[a]] ?? 99;
+      const rb = ENV_ORDER[ACCOUNT_ALIASES[b]] ?? 99;
+      return ra - rb;
+    });
   }, [reports]);
 
   const totalAfterAccount = useMemo(() => {
@@ -75,14 +75,17 @@ export default function TimelineFilters({
         </FilterPill>
         {accounts.map((acc) => {
           const count = reports.filter((r) => r.account_id === acc).length;
+          const alias = ACCOUNT_ALIASES[acc] ?? acc;
+          const envColor = ENV_COLORS[alias] ?? accent;
           return (
             <FilterPill
               key={acc}
               active={accountFilter === acc}
-              accent={accent}
+              accent={envColor}
+              colored
               onClick={() => onAccountChange(acc)}
             >
-              {ACCOUNT_ALIASES[acc] ?? acc}
+              {alias}
               <span className="timeline-filters__count">{count}</span>
             </FilterPill>
           );
@@ -116,8 +119,11 @@ export default function TimelineFilters({
   );
 }
 
-function FilterPill({ active, accent, onClick, children }) {
+function FilterPill({ active, accent, colored = false, onClick, children }) {
   const [hover, setHover] = useState(false);
+  // Para pastillas de ambiente (colored): siempre muestran su color de borde/texto,
+  // y se rellenan cuando están activas o en hover. Para "Todas" se mantiene el estilo neutro.
+  const showColor = active || (colored && hover);
   return (
     <button
       type="button"
@@ -130,9 +136,15 @@ function FilterPill({ active, accent, onClick, children }) {
         gap: 6,
         padding: "5px 12px",
         borderRadius: 999,
-        border: `1px solid ${active ? accent : "var(--border)"}`,
-        background: active ? `${accent}14` : (hover ? "var(--surface-2)" : "var(--surface)"),
-        color: active ? accent : "var(--text-2)",
+        border: `1px solid ${colored ? accent : active ? accent : "var(--border)"}`,
+        background: active
+          ? `${accent}14`
+          : colored && hover
+            ? `${accent}0d`
+            : hover
+              ? "var(--surface-2)"
+              : "var(--surface)",
+        color: colored || showColor ? accent : "var(--text-2)",
         fontSize: 12,
         fontWeight: 600,
         cursor: "pointer",

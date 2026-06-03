@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect } from "react";
 import StatusBadge from "./StatusBadge.jsx";
+import { accountColor } from "./insightsHelpers.js";
 
 const ACCOUNT_ALIASES = {
   "792654060327": "DEV",
@@ -75,7 +76,10 @@ export default function EcsFluentbitReportDetail({ report }) {
           <div style={styles.reportTitle}>Fluent Bit en servicios ECS</div>
           <div style={styles.reportMeta}>
             <Pill label={formatDate(timestamp)} />
-            <Pill label={`Cuenta ${ACCOUNT_ALIASES[account_id] ?? account_id}`} accent />
+            <Pill
+              label={`Cuenta ${ACCOUNT_ALIASES[account_id] ?? account_id}`}
+              color={accountColor(account_id)}
+            />
             <Pill label={<>sidecar: <code style={styles.code}>{fbName}</code></>} />
           </div>
         </div>
@@ -432,7 +436,16 @@ function Panel({ title, children }) {
   );
 }
 
-function Pill({ label, accent }) {
+function Pill({ label, accent, color }) {
+  // `color` (ej. color de ambiente) tiene prioridad: pinta texto, borde y un fondo tenue.
+  // `accent` mantiene el estilo morado original. Sin ninguno: estilo neutro/gris.
+  const resolved = color
+    ? { background: `${color}1a`, color, border: `1px solid ${color}55` }
+    : {
+        background: accent ? "var(--accent-soft)" : "var(--surface-2)",
+        color: accent ? "var(--accent)" : "var(--muted)",
+        border: `1px solid ${accent ? "transparent" : "var(--border)"}`,
+      };
   return (
     <span
       style={{
@@ -441,10 +454,8 @@ function Pill({ label, accent }) {
         padding: "3px 10px",
         borderRadius: 999,
         fontSize: 12,
-        fontWeight: 500,
-        background: accent ? "var(--accent-soft)" : "var(--surface-2)",
-        color: accent ? "var(--accent)" : "var(--muted)",
-        border: `1px solid ${accent ? "transparent" : "var(--border)"}`,
+        fontWeight: color ? 700 : 500,
+        ...resolved,
       }}
     >
       {label}

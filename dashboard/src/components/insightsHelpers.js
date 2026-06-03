@@ -6,10 +6,27 @@ export const ACCOUNT_ALIASES = {
   "213698163176": "QA",
 };
 
+// Color por ambiente, alineado con los tokens del tema (index.css):
+// DEV verde (--green), QA amarillo (--yellow), PRD rojo (--red).
+export const ENV_COLORS = {
+  DEV: "#10b981",
+  QA: "#f59e0b",
+  PRD: "#ef4444",
+};
+
+// Orden de aparición de los ambientes en filtros y leyendas: DEV → QA → PRD.
+export const ENV_ORDER = { DEV: 0, QA: 1, PRD: 2 };
+
+// Color directo a partir del account_id. Cae a gris para cuentas
+// desconocidas o reportes single-account (sin account_id).
+export function accountColor(accountId) {
+  return ENV_COLORS[ACCOUNT_ALIASES[accountId]] ?? "#6b7280";
+}
+
 export const ACCOUNT_COLORS = {
-  "792654060327": "#4f46e5",
-  "503134114226": "#0ea5e9",
-  "213698163176": "#10b981",
+  "792654060327": ENV_COLORS.DEV,
+  "503134114226": ENV_COLORS.PRD,
+  "213698163176": ENV_COLORS.QA,
   default: "#6b7280",
 };
 
