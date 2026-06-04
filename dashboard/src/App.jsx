@@ -51,6 +51,13 @@ const AUDIT_TYPES = [
     icon: "🚢",
     accent: "#0891b2",
   },
+  {
+    id: "audit_apigateway_waf",
+    label: "API Gateway WAF",
+    description: "APIs protegidas con Web ACL (WAF)",
+    icon: "🛡️",
+    accent: "#7c3aed",
+  },
 ];
 
 export default function App() {
