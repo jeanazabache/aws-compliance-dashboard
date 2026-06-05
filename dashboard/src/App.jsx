@@ -24,11 +24,11 @@ function localDay(ts) {
 // Definición de los tipos de auditoría que entiende el dashboard.
 const AUDIT_TYPES = [
   {
-    id: "audit_utp_repos",
-    label: "Repositorios GitHub",
-    description: "Compliance de repos UTPXpedition",
-    icon: "🐙",
-    accent: "#4f46e5",
+    id: "audit_cloudwatch_logs",
+    label: "CloudWatch Logs",
+    description: "Top de log groups por ingesta",
+    icon: "📊",
+    accent: "#f59e0b",
   },
   {
     id: "audit_aws_tags",
@@ -38,11 +38,11 @@ const AUDIT_TYPES = [
     accent: "#0ea5e9",
   },
   {
-    id: "audit_cloudwatch_logs",
-    label: "CloudWatch Logs",
-    description: "Top de log groups por ingesta",
-    icon: "📊",
-    accent: "#f59e0b",
+    id: "audit_utp_repos",
+    label: "Repositorios GitHub",
+    description: "Compliance de repos UTPXpedition",
+    icon: "🐙",
+    accent: "#4f46e5",
   },
   {
     id: "audit_ecs_fluentbit",
