@@ -31,6 +31,8 @@
         "arn:aws:s3:::utp-aope-reportes-de-auditoria/reports/audit_aws_tags/*",
         "arn:aws:s3:::utp-aope-reportes-de-auditoria/reports/audit_cloudwatch_logs/*",
         "arn:aws:s3:::utp-aope-reportes-de-auditoria/reports/audit_ecs_fluentbit/*",
+        "arn:aws:s3:::utp-aope-reportes-de-auditoria/reports/audit_apigateway_waf/*",
+        "arn:aws:s3:::utp-aope-reportes-de-auditoria/reports/audit_cloudfront_waf/*",
         "arn:aws:s3:::utp-aope-reportes-de-auditoria/reports/index.json"
       ]
     }

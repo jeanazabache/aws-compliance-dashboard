@@ -58,6 +58,13 @@ const AUDIT_TYPES = [
     icon: "🛡️",
     accent: "#7c3aed",
   },
+  {
+    id: "audit_cloudfront_waf",
+    label: "CloudFront WAF",
+    description: "Distribuciones protegidas con WAF",
+    icon: "🌐",
+    accent: "#dc2626",
+  },
 ];
 
 export default function App() {
