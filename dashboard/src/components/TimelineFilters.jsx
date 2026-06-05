@@ -65,14 +65,6 @@ export default function TimelineFilters({
     <div className="timeline-filters">
       <div className="timeline-filters__row">
         <span className="timeline-filters__label">Cuenta:</span>
-        <FilterPill
-          active={accountFilter === "all"}
-          accent={accent}
-          onClick={() => onAccountChange("all")}
-        >
-          Todas
-          <span className="timeline-filters__count">{reports.length}</span>
-        </FilterPill>
         {accounts.map((acc) => {
           const count = reports.filter((r) => r.account_id === acc).length;
           const alias = ACCOUNT_ALIASES[acc] ?? acc;
@@ -83,7 +75,7 @@ export default function TimelineFilters({
               active={accountFilter === acc}
               accent={envColor}
               colored
-              onClick={() => onAccountChange(acc)}
+              onClick={() => onAccountChange(accountFilter === acc ? "all" : acc)}
             >
               {alias}
               <span className="timeline-filters__count">{count}</span>
@@ -121,9 +113,8 @@ export default function TimelineFilters({
 
 function FilterPill({ active, accent, colored = false, onClick, children }) {
   const [hover, setHover] = useState(false);
-  // Para pastillas de ambiente (colored): siempre muestran su color de borde/texto,
-  // y se rellenan cuando están activas o en hover. Para "Todas" se mantiene el estilo neutro.
-  const showColor = active || (colored && hover);
+  // Botones de ambiente: fondo sólido con su color, texto blanco.
+  // Cuando no activo: fondo tenue del color, texto del color.
   return (
     <button
       type="button"
@@ -136,17 +127,15 @@ function FilterPill({ active, accent, colored = false, onClick, children }) {
         gap: 6,
         padding: "5px 12px",
         borderRadius: 999,
-        border: `1px solid ${colored ? accent : active ? accent : "var(--border)"}`,
+        border: `1px solid ${accent}`,
         background: active
-          ? `${accent}14`
-          : colored && hover
-            ? `${accent}0d`
-            : hover
-              ? "var(--surface-2)"
-              : "var(--surface)",
-        color: colored || showColor ? accent : "var(--text-2)",
+          ? accent
+          : hover
+            ? `${accent}30`
+            : `${accent}18`,
+        color: active ? "#fff" : accent,
         fontSize: 12,
-        fontWeight: 600,
+        fontWeight: 700,
         cursor: "pointer",
         transition: "all var(--t-fast)",
       }}
