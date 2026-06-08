@@ -74,7 +74,7 @@ const AUDIT_TYPES = [
   },
   {
     id: "audit_lambda_logging",
-    label: "Lambda Logging",
+    label: "Lambda Logs",
     description: "Lambdas con permisos de CloudWatch Logs",
     icon: "⚡",
     accent: "#8b5cf6",
