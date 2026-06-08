@@ -4,6 +4,8 @@ import CloudwatchLogsReportDetail from "./CloudwatchLogsReportDetail.jsx";
 import EcsFluentbitReportDetail from "./EcsFluentbitReportDetail.jsx";
 import ApigatewayWafReportDetail from "./ApigatewayWafReportDetail.jsx";
 import CloudfrontWafReportDetail from "./CloudfrontWafReportDetail.jsx";
+import ApigatewayLogsReportDetail from "./ApigatewayLogsReportDetail.jsx";
+import LambdaLoggingReportDetail from "./LambdaLoggingReportDetail.jsx";
 
 /**
  * Selector de vista según el tipo de reporte.
@@ -16,6 +18,8 @@ const VIEW_BY_SCRIPT = {
   audit_ecs_fluentbit: EcsFluentbitReportDetail,
   audit_apigateway_waf: ApigatewayWafReportDetail,
   audit_cloudfront_waf: CloudfrontWafReportDetail,
+  audit_apigateway_logs: ApigatewayLogsReportDetail,
+  audit_lambda_logging: LambdaLoggingReportDetail,
 };
 
 export default function ReportDetail({ report }) {

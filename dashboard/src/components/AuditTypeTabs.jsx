@@ -29,6 +29,8 @@ function TabCard({ type, stats, active, loading, onClick }) {
 
   // Para CloudWatch Logs no aplica un % de compliance — mostramos GB ingestados totales.
   const isLogsAudit = type.id === "audit_cloudwatch_logs";
+  // Para estos reportes informativos no se muestra porcentaje de compliance.
+  const isInformativeAudit = type.id === "audit_apigateway_logs" || type.id === "audit_lambda_logging";
 
   let primary = null;
   let primaryColor = "var(--muted)";
@@ -46,6 +48,10 @@ function TabCard({ type, stats, active, loading, onClick }) {
       primary = formatBytesShort(totalBytes);
       primaryColor = totalCost > 100 ? "var(--red)" : (totalCost > 30 ? "var(--yellow)" : "var(--green)");
       secondary = `$${totalCost.toFixed(0)} USD/sem · ${agg.total.toLocaleString()} log groups`;
+    } else if (isInformativeAudit) {
+      primary = "—";
+      primaryColor = "transparent";
+      secondary = `${agg.accounts > 1 ? `${agg.accounts} cuentas · ` : ""}${stats.count} reportes`;
     } else {
       const denominator = agg.total - agg.skipped;
       const pct = denominator > 0 ? Math.round((agg.compliant / denominator) * 100) : null;
@@ -98,9 +104,11 @@ function TabCard({ type, stats, active, loading, onClick }) {
               {primary}
             </div>
             <div style={styles.cardMeta}>{secondary}</div>
-            <div style={styles.cardMeta}>
-              {accountsLabel ? `${accountsLabel} · ` : ""}{stats.count} reportes
-            </div>
+            {!isInformativeAudit && (
+              <div style={styles.cardMeta}>
+                {accountsLabel ? `${accountsLabel} · ` : ""}{stats.count} reportes
+              </div>
+            )}
           </>
         ) : (
           <>

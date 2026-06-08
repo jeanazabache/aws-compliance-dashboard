@@ -65,6 +65,20 @@ const AUDIT_TYPES = [
     icon: "🌐",
     accent: "#dc2626",
   },
+  {
+    id: "audit_apigateway_logs",
+    label: "API Gateway Logs",
+    description: "Logging y tracing en API Gateway",
+    icon: "📋",
+    accent: "#0d9488",
+  },
+  {
+    id: "audit_lambda_logging",
+    label: "Lambda Logging",
+    description: "Lambdas con permisos de CloudWatch Logs",
+    icon: "⚡",
+    accent: "#8b5cf6",
+  },
 ];
 
 export default function App() {

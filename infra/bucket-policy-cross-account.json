@@ -33,6 +33,8 @@
         "arn:aws:s3:::utp-aope-reportes-de-auditoria/reports/audit_ecs_fluentbit/*",
         "arn:aws:s3:::utp-aope-reportes-de-auditoria/reports/audit_apigateway_waf/*",
         "arn:aws:s3:::utp-aope-reportes-de-auditoria/reports/audit_cloudfront_waf/*",
+        "arn:aws:s3:::utp-aope-reportes-de-auditoria/reports/audit_apigateway_logs/*",
+        "arn:aws:s3:::utp-aope-reportes-de-auditoria/reports/audit_lambda_logging/*",
         "arn:aws:s3:::utp-aope-reportes-de-auditoria/reports/index.json"
       ]
     }
